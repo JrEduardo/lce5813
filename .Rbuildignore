@@ -1,0 +1,11 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+\#*\#
+^\.\#*
+
+^\.travis.yml$
+playground.R
+README.*
+LICENSE
+^data-raw$
+^docs$
