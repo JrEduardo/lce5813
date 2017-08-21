@@ -42,13 +42,17 @@ beta_binomial <- function(prior, y) {
         }
         return(out)
     }
-    # Summarise posterior
-    summary <- with(posterior, {
-        mu <- alpha / (alpha + beta)
-        va <- alpha * beta / ((alpha + beta)^2 * (alpha + beta + 1))
-        mo <- (alpha - 1) / (alpha + beta - 2)
-        mo <- mo * ifelse(alpha > 1 & beta > 1, 1, NA)
-        list("Mean" = mu, "Mode" = mo, "Variance" = va)
+    # Summarise distributions
+    dnames <- c("prior", "likelihood", "posterior")
+    names(dnames) <- dnames
+    summary <- lapply(dnames, function(d) {
+        with(eval(parse(text = d)), {
+            mu <- alpha / (alpha + beta)
+            va <- alpha * beta / ((alpha + beta)^2 * (alpha + beta + 1))
+            mo <- (alpha - 1) / (alpha + beta - 2)
+            mo <- mo * ifelse(alpha > 1 & beta > 1, 1, NA)
+            list("Mean" = mu, "Mode" = mo, "Variance" = va)
+        })
     })
     # Output
     out <- list("model" = "Beta-Binomial",

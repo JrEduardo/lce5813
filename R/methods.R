@@ -5,6 +5,8 @@
 #' @description Methods functions
 #' @param x An object of class \code{conjugate}.
 #' @param object An object of class \code{conjugate}.
+#' @param dist The distribution that is used, \code{posterior},
+#'     \code{prior} or \code{likelihood} distribution.
 #' @param ... unused.
 #'
 NULL
@@ -36,13 +38,16 @@ print.conjugate <- function(x, ...) {
 #' @rdname methods-conjugate
 #' @export
 summary.conjugate <- function(object, ...) {
+    dist <- c("posterior", "likelihood", "prior")
     probs <- c(0.025, 0.975)
-    cname <- unlist(lapply(c("QTS", "HPD"), paste0, probs))
-    conf_qts <- confint_qts(object, level = 0.95)
-    conf_hpd <- confint_hpd(object, level = 0.95)
-    out <- rbind(c(do.call(c, object$summary), conf_qts, conf_hpd))
-    colnames(out)[-(1:3)] <- cname
-    rownames(out) <- "theta"
+    cname <- paste0("QTS", probs)
+    conf_qts <- lapply(dist, function(d)
+        confint_qts(object, dist = d))
+    out <- do.call(rbind, object$summary[dist])
+    out <- cbind(out, do.call(rbind, conf_qts))
+    out <- matrix(unlist(out), nrow = 3)
+    colnames(out) <- c("Mean", "Mode", "Variance", cname)
+    rownames(out) <- dist
     attr(out, "class") <- "summary.conjugate"
     attr(out, "model") <- object$model
     return(out)
@@ -56,14 +61,15 @@ summary.conjugate <- function(object, ...) {
 print.summary.conjugate <- function(x, digits = getOption("digits"),
                                     ...) {
     model <- attr(x, "model")
-    nc <- max(nchar(as.integer(unlist(x))))
+    nc <- max(nchar(as.integer(x)[!is.na(x)]))
     x <- formatC(x, digits = digits, width = nc + digits + 1,
                  format = "f")
-    conf_qts <- sprintf("(%s, %s)", x[4], x[5])
+    conf_qts <- apply(x, 1, function(p)
+        sprintf("(%s, %s)", p[4], p[5]))
     out <- data.frame(x)[, 1:3]
     out[["Confidence interval"]] <- conf_qts
     cat(sprintf("Conjugate distribution: %s", model), sep = "\n")
-    cat("Posterior summary\n", sep = "\n")
+    cat("", "\n")
     print(out)
     invisible()
 }
@@ -77,34 +83,44 @@ print.summary.conjugate <- function(x, digits = getOption("digits"),
 #' @param parm Unused.
 #' @importFrom rootSolve uniroot.all
 # @inheritParams stats::confint
-confint.conjugate <- function(object, parm = "theta", level = 0.95,
-                              type = c("quantile", "hpd"), ...) {
-    probs <- (1 + c(-1, 1) * level) * 100 / 2
+confint.conjugate <- function(object,
+                              parm = "theta",
+                              level = 0.95,
+                              type = c("quantile", "hpd"),
+                              dist = c("posterior", "likelihood",
+                                       "prior"), ...) {
     type <- match.arg(type)
+    dist <- match.arg(dist)
+    probs <- (1 + c(-1, 1) * level) * 100 / 2
     fun <- switch(type, "quantile" = confint_qts, "hpd" = confint_hpd)
-    quantis <- rbind(fun(object, level))
+    quantis <- rbind(fun(object, level, dist))
     colnames(quantis) <- paste0(round(probs, getOption("digits")), "%")
     rownames(quantis) <- "theta"
     quantis
 }
-confint_qts <- function(object, level = 0.95) {
+confint_qts <- function(object, level = 0.95,
+                        dist = c("posterior", "likelihood",
+                                 "prior")) {
     probs <- (1 + c(-1, 1) * level) / 2
-    quantis <- with(object, {
-        distribution$q(probs, posterior[[1]], posterior[[2]])
-    })
+    dist <- match.arg(dist)
+    quantis <- object$distribution$q(probs, object[[dist]][[1]],
+                                     object[[dist]][[2]])
     return(quantis)
 }
-confint_hpd <- function(object, level = 0.95) {
+confint_hpd <- function(object, level = 0.95,
+                        dist = c("posterior", "likelihood",
+                                 "prior")) {
     # interval to be searched for the root (I have to improve this)
-    interval <- extendrange(confint_qts(object, level), f = 0.3)
-    maxdensi <- with(object, {
-        distribution$d(summary$Mean, posterior[[1]], posterior[[2]])
-    })
+    interval <- extendrange(confint_qts(object, level, dist),
+                            f = 0.3)
+    maxdensi <- object$distribution$d(object$summary[[dist]]$Mean,
+                                      object[[dist]][[1]],
+                                      object[[dist]][[2]])
     findqt <- function(x, k) {
-        with(object$posterior,
+        with(object[[dist]],
              object$distribution$d(x, alpha, beta) - k)
     }
-    kchoose <- with(object$posterior, {
+    kchoose <- with(object[[dist]], {
         hpdfun <- function(k) {
             roots <- rootSolve::uniroot.all(findqt, interval, k = k)
             (diff(pbeta(roots, alpha, beta)) - level)^2
