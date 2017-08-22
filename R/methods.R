@@ -34,7 +34,7 @@ print.conjugate <- function(x, ...) {
 }
 
 #-------------------------------------------
-# Summary posterior
+# Summary
 #' @rdname methods-conjugate
 #' @export
 summary.conjugate <- function(object, ...) {
@@ -67,7 +67,7 @@ print.summary.conjugate <- function(x, digits = getOption("digits"),
     conf_qts <- apply(x, 1, function(p)
         sprintf("(%s, %s)", p[4], p[5]))
     out <- data.frame(x)[, 1:3]
-    out[["Confidence interval"]] <- conf_qts
+    out[["Probability interval"]] <- conf_qts
     cat(sprintf("Conjugate distribution: %s", model), sep = "\n")
     cat("", "\n")
     print(out)
@@ -75,7 +75,7 @@ print.summary.conjugate <- function(x, digits = getOption("digits"),
 }
 
 #-------------------------------------------
-# Conficence intervals
+# Probability intervals
 #' @rdname methods-conjugate
 #' @export
 #' @param level The confidence level required.
@@ -129,4 +129,85 @@ confint_hpd <- function(object, level = 0.95,
     })
     quantis <- rootSolve::uniroot.all(findqt, interval, k = kchoose)
     return(quantis)
+}
+
+#-------------------------------------------
+# Plots
+#' @title Draw Distributions of a Univariate Bayesian Model
+#' @description Draw distributions (prior, likelihood, posterior and
+#'     predictive) of a univariate bayesian model.
+#' @param x An object of class \code{conjugate}.
+#' @param dist The distribution that is used, \code{posterior},
+#'     \code{prior}, \code{likelihood} or \code{predictive} distribution.
+#' @param interval interval to draw density. A list with arguments to
+#'     the function \code{seq}.
+#' @param type,size,ylab,xlab,... Graphics parameters.
+#' @importFrom lattice xyplot
+#' @export
+plot.conjugate <- function(x,
+                           dist = c("posterior", "likelihood",
+                                    "prior", "predictive"),
+                           interval = NULL,
+                           type = "l",
+                           size = NULL,
+                           ylab = NULL,
+                           xlab = NULL,
+                           ...) {
+    #-------------------------------------------
+    # Protections
+    if (!is.null(interval) & !is.list(interval)) {
+        msg <- paste("`interval` should be a list with arguments",
+                     "to the function `seq`")
+        stop(msg)
+    }
+    #-------------------------------------------
+    dist <- match.arg(dist)
+    if (is.null(ylab)) ylab <- "Density"
+    if (dist == "predictive") {
+        if (is.null(xlab)) xlab <- expression(y)
+        fun <- x[[dist]]
+        y <- do.call(seq, interval)
+        if (x$model == "Beta-Binomial") {
+            fy <- fun(y, size)
+        } else {
+            fy <- fun(y)
+        }
+        out <- lattice::xyplot(fy ~ y, type = type,
+                               ylab = ylab, xlab = xlab, ...)
+    } else {
+        if (is.null(xlab)) xlab <- expression(theta)
+        pars <- x[[dist]]
+        if (is.null(interval)) {
+            range <- confint_qts(x, level = 1 - 1e-5, dist = dist)
+            interval <- list(range[1], range[2], length = 101)
+        }
+        theta <- do.call(seq, interval)
+        densi <- x$distribution$d(theta, pars[[1]], pars[[2]])
+        out <- lattice::xyplot(densi ~ theta, type = type,
+                               ylab = ylab, xlab = xlab, ...)
+    }
+    attr(out, "class") <- c("plot.conjugate", "trellis")
+    return(out)
+}
+
+#' @title Produce a Legend or Key
+#' @description Produce a legend or key based on a list of arguments.
+#' @param lines,... Parameter into a list to create key.
+#' @export
+#' @import lattice
+#' @import latticeExtra
+draw_legend <- function(lines = TRUE, ...) {
+    out <- list(lines = lines, ...)
+    attr(out, "class") <- "plot.conjugate"
+    attr(out, "islegend") <- TRUE
+    return(out)
+}
+
+`+.plot.conjugate` <- function(object1, object2) {
+    if (is.null(attr(object2, "islegend"))) {
+        out <- latticeExtra:::`+.trellis`(object1, object2)
+    } else {
+        out <- lattice:::update.trellis(object1, key = object2)
+    }
+    return(out)
 }
