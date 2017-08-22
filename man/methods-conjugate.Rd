@@ -3,13 +3,20 @@
 \name{methods-conjugate}
 \alias{methods-conjugate}
 \alias{print.conjugate}
+\alias{summary.conjugate}
+\alias{print.summary.conjugate}
 \alias{confint.conjugate}
 \title{S3 Methods for the Object of Conjugate Class}
 \usage{
 \method{print}{conjugate}(x, ...)
 
+\method{summary}{conjugate}(object, ...)
+
+\method{print}{summary.conjugate}(x, digits = getOption("digits"), ...)
+
 \method{confint}{conjugate}(object, parm = "theta", level = 0.95,
-  type = c("quantile", "hpd"), ...)
+  type = c("quantile", "hpd"), dist = c("posterior", "likelihood", "prior"),
+  ...)
 }
 \arguments{
 \item{x}{An object of class \code{conjugate}.}
@@ -18,17 +25,17 @@
 
 \item{object}{An object of class \code{conjugate}.}
 
+\item{digits}{the desired number of digits after the decimal point.}
+
 \item{parm}{Unused.}
 
 \item{level}{The confidence level required.}
 
 \item{type}{The type of interval.}
+
+\item{dist}{The distribution that is used, \code{posterior},
+\code{prior} or \code{likelihood} distribution.}
 }
 \description{
 Methods functions
-}
-\author{
-Eduardo Junior <edujrrib@gmail.com>
-
-Eduardo Junior <edujrrib@gmail.com>
 }
